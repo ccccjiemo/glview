@@ -2,8 +2,11 @@
   "name": "@jemoc/glview",
   "version": "1.0.0",
   "description": "Please describe the basic information.",
+  "keywords": ["opengl", "egl", "surface", "xComponent"],
+  "homepage": "https://github.com/ccccjiemo/glview.git",
   "main": "Index.ets",
-  "author": "",
+  "author": "ccccjiemo",
+  "repository": "https://github.com/ccccjiemo/glview.git",
   "license": "Apache-2.0",
   "dependencies": {
     "@jemoc/egl": 'file:../egl',
