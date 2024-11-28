@@ -1,6 +1,6 @@
 {
   "name": "@jemoc/glview",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "组建结合egl和opengl es能力，可以在arkTs侧进行opengl渲染绘制",
   "keywords": [
     "opengl",
