@@ -8,6 +8,7 @@ export struct GLViewV2 {
   controller?: GLViewController;
   private viewController: ViewController = new ViewController();
   eglContextClientVersion?: number;
+  onCreated?: Function;
   @Param renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
   aboutToAppear(): void {
@@ -16,6 +17,7 @@ export struct GLViewV2 {
       this.controller?.setEGLContextClientVersion(this.eglContextClientVersion);
     }
     this.controller?.setRenderMode(this.renderMode);
+    this.controller?.registerOnCreated(this.onCreated);
   }
 
   build() {

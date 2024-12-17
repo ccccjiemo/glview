@@ -1,18 +1,19 @@
-import { egl, NativeHelper } from "@jemoc/egl";
+import { egl } from "@jemoc/egl";
 import { displaySync } from "@kit.ArkGraphics2D";
 import { GLViewRenderMode } from "./GLViewRenderMode";
+import { DOMAIN, TAG } from './common'
+import { hilog } from "@kit.PerformanceAnalysisKit";
 
 export abstract class GLViewController {
-  private eglDisplay: egl.EGLDisplay = null;
-  private eglConfig: egl.EGLConfig = null;
-  private eglContext: egl.EGLContext = null;
-  private window: egl.EGLNativeWindowType = null;
-  private eglSurface: egl.EGLSurface = null;
+  private eglDisplay?: egl.EGLDisplay;
+  private eglConfig?: egl.EGLConfig;
+  private eglContext?: egl.EGLContext;
+  private eglSurface?: egl.EGLSurface;
   private eglClientVersion: number = 2;
   private renderMode: GLViewRenderMode = GLViewRenderMode.CONTINUOUSLY;
   private vSync?: displaySync.DisplaySync;
-  private eglVersion: egl.EGLVersion = {};
   private isInit: boolean = false;
+  private onCreated?: Function;
 
   abstract onSurfaceCreated(): void;
 
@@ -27,6 +28,7 @@ export abstract class GLViewController {
   }
 
 
+
   /* getEGLConfig(): egl.EGLConfig {
      return this.eglConfig;
    }
@@ -39,17 +41,21 @@ export abstract class GLViewController {
      return this.eglContext;
    }*/
 
+  registerOnCreated(onCreated?: Function) {
+    this.onCreated = onCreated;
+  }
+
   setRenderMode(mode: GLViewRenderMode): void {
     if (mode == this.renderMode) {
       return;
     }
+    hilog.debug(DOMAIN, TAG, `GLViewController set render mode %{public}s`, mode ? 'CONTINUOUSLY' : 'WHEN_DIRTY');
     if (this.renderMode == GLViewRenderMode.CONTINUOUSLY) {
       this.vSync?.stop();
     } else {
       this.vSync?.start();
     }
     this.renderMode = mode;
-
   }
 
   requestRender(): void {
@@ -61,25 +67,41 @@ export abstract class GLViewController {
   }
 
   raiseSurfaceCreated(surfaceId: string): void {
-    this.init(surfaceId).then(() => {
+    //初始化egl
+    this.init(surfaceId);
+
+    if (!this.isInit) {
+      throw Error('init egl fail')
+    }
+
+    //加入异步队列，等待surfaceChanged完成再执行
+    setTimeout(() => {
       if (this.renderMode == GLViewRenderMode.CONTINUOUSLY) {
         this.vSync?.start();
       } else {
-        setTimeout(() => {
-          this.render()
-        }, 0)
+        this.render()
       }
-    })
+    }, 0);
+
+    if (this.onCreated) {
+      this.onCreated();
+    }
+
+
+    // this.init(surfaceId).then(() => {
+    //
+    // })
   }
 
   raiseSurfaceChanged(rect: SurfaceRect): void {
     if (this.renderMode == GLViewRenderMode.CONTINUOUSLY) {
       this.vSync?.stop();
     }
-    this.makeCurrent();
-    this.onSurfaceChanged(rect);
-    if (this.renderMode == GLViewRenderMode.CONTINUOUSLY) {
-      this.vSync?.start();
+    if (this.makeCurrent()) {
+      this.onSurfaceChanged(rect);
+      if (this.renderMode == GLViewRenderMode.CONTINUOUSLY) {
+        this.vSync?.start();
+      }
     }
   }
 
@@ -89,15 +111,17 @@ export abstract class GLViewController {
     this.eglDestroy();
   }
 
-  private async init(surfaceId: string): Promise<void> {
+  private init(surfaceId: string) {
     if (this.isInit) {
       return;
     }
     this.eglInit(surfaceId);
-    this.makeCurrent();
-    this.onSurfaceCreated();
-    this.initVSync();
-    this.isInit = true;
+    if (this.makeCurrent()) {
+      this.onSurfaceCreated();
+      this.initVSync();
+      this.isInit = true;
+    }
+
   }
 
   private initVSync(): void {
@@ -118,43 +142,47 @@ export abstract class GLViewController {
 
 
   private render = (data?: displaySync.IntervalInfo): void => {
-    this.makeCurrent();
-    this.onDrawFrame(data?.timestamp || 0, data?.targetTimestamp || 0);
-    this.swapBuffer();
+    hilog.debug(DOMAIN, TAG, 'GLViewController render frame');
+    if (this.makeCurrent()) {
+      this.onDrawFrame(data?.timestamp || 0, data?.targetTimestamp || 0);
+      this.swapBuffer();
+    }
+
   }
 
   private eglDestroy(): void {
-    egl.eglDestroyContext(this.eglDisplay, this.eglContext);
-    egl.eglDestroySurface(this.eglDisplay, this.eglSurface);
+    this.eglDisplay?.destroyContext(this.eglContext);
+    this.eglDisplay?.destroySurface(this.eglSurface);
     egl.eglReleaseThread();
-    egl.eglTerminate(this.eglDisplay);
+    this.eglDisplay?.terminate();
   }
 
-  private makeCurrent(): boolean {
-    return Boolean(egl.eglMakeCurrent(this.eglDisplay, this.eglSurface, this.eglSurface, this.eglContext));
+  makeCurrent(): boolean {
+    let result = Boolean(this.eglDisplay?.makeCurrent(this.eglSurface, this.eglSurface, this.eglContext));
+    hilog.debug(DOMAIN, TAG, 'makeCurrent %{public}s', result);
+    return result;
   }
 
-  private swapBuffer(): void {
-    egl.eglSwapBuffers(this.eglDisplay, this.eglSurface);
+  swapBuffer(): void {
+    hilog.debug(DOMAIN, TAG, 'swapBuffer');
+    this.eglDisplay?.swapBuffers(this.eglSurface);
   }
 
   private eglInit(surfaceId: string): void {
-    this.window = NativeHelper.getWindowFromSurfaceId(surfaceId);
-
-    if (this.window == null) {
-      throw new Error("get Window failed");
-    }
+    hilog.debug(DOMAIN, TAG, 'init egl start');
 
     //获取egl display
-    this.eglDisplay = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
+    this.eglDisplay = egl.EGLDisplay.getDisplay();
 
     //判断egl显示设备是否正常
-    if (this.eglDisplay == egl.EGL_NO_DISPLAY) {
+    if (!this.eglDisplay) {
+      hilog.debug(DOMAIN, TAG, 'eglGetDisplay failed');
       throw new Error("eglGetDisplay failed");
     }
 
     //获取egl的主次版本号
-    if (!egl.eglInitialize(this.eglDisplay, this.eglVersion)) {
+    if (!this.eglDisplay.initialize()) {
+      hilog.debug(DOMAIN, TAG, 'eglInitialize failed');
       throw new Error("eglInitialize failed");
     }
 
@@ -165,24 +193,25 @@ export abstract class GLViewController {
       egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
       egl.EGL_NONE];
 
-    let configs = [];
-    if (!egl.eglChooseConfig(this.eglDisplay, attrib_list, 1, configs)) {
+    if (!(this.eglConfig = this.eglDisplay.chooseConfig(attrib_list)[0])) {
+      hilog.debug(DOMAIN, TAG, 'eglChooseConfig failed');
       throw new Error("eglChooseConfig failed");
     }
-    this.eglConfig = configs[0];
 
-    let eglContextAttribs: egl.EGLint[] = [egl.EGL_CONTEXT_CLIENT_VERSION, this.eglClientVersion, egl.EGL_NONE];
-    this.eglContext = egl.eglCreateContext(this.eglDisplay, this.eglConfig, egl.EGL_NO_CONTEXT, eglContextAttribs);
-
-    if (this.eglContext == egl.EGL_NO_CONTEXT) {
+    if (!(this.eglContext = this.eglDisplay.createContext(this.eglConfig, egl.EGL_NO_CONTEXT,
+      [egl.EGL_CONTEXT_CLIENT_VERSION, this.eglClientVersion, egl.EGL_NONE]))) {
+      hilog.debug(DOMAIN, TAG, 'eglCreateContext failed');
       throw new Error("eglCreateContext failed");
     }
 
-    this.eglSurface = egl.eglCreateWindowSurface(this.eglDisplay, this.eglConfig, this.window);
-
-    if (this.eglSurface == egl.EGL_NO_SURFACE) {
+    if (!(this.eglSurface = this.eglDisplay.createSurfaceWindow(this.eglConfig, surfaceId))) {
+      hilog.debug(DOMAIN, TAG, 'eglCreateWindowSurface failed');
       throw new Error("eglCreateWindowSurface failed");
     }
+
+    let error = egl.eglGetError();
+    hilog.debug(DOMAIN, TAG, 'init egl end, error = %{public}d', error);
+
   }
 }
 

@@ -6,6 +6,6 @@ export { GLViewController } from './src/main/ets/GLViewController'
 
 export { GLViewRenderMode } from './src/main/ets/GLViewRenderMode'
 
-export { egl, NativeHelper } from '@jemoc/egl'
-
 export { gles } from '@jemoc/gles'
+
+export { egl } from '@jemoc/egl'
