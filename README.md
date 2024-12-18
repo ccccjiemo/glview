@@ -54,6 +54,14 @@ GLView({ options: { controller: GLViewController, eglContextClientVersion: numbe
 
 更改组件渲染模式
 
+#### makeCurrent(): boolean
+
+绑定egl上下文
+
+#### swapBuffer(): void
+
+交换前缓冲区和后缓冲区
+
 ---
 
 ### 下载安装
@@ -185,7 +193,7 @@ class MyController extends GLViewController {
     //   }
     //   let error = this.nativeImage.updateSurfaceImage();
     // }
-    
+
     gles.glClearColor(0.6, 0.6, 0.6, 1.0);
     gles.glClear(gles.GL_COLOR_BUFFER_BIT | gles.GL_DEPTH_BUFFER_BIT);
     gles.glUseProgram(this.program);
@@ -217,7 +225,5 @@ struct Index {
   }
 }
 ```
-
-
 
 ![img.png](src/assett/test.png)
