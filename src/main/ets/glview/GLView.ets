@@ -1,4 +1,4 @@
-import { GLViewRenderMode } from "./GLViewRenderMode";
+import { GLViewRenderMode } from "../common/GLViewRenderMode";
 import { GLViewController } from "./GLViewController";
 import { ViewController } from "./ViewController";
 
@@ -6,9 +6,9 @@ import { ViewController } from "./ViewController";
 @Component
 export struct GLView {
   controller?: GLViewController;
-  private viewController: ViewController = new ViewController();
   eglContextClientVersion?: number;
   onCreated?: Function
+  private viewController: ViewController = new ViewController();
   @Prop @Watch('onRenderModeChanged') renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
   onRenderModeChanged(propName: string) {

@@ -1,4 +1,4 @@
-import { GLViewRenderMode } from "./GLViewRenderMode";
+import { GLViewRenderMode } from "../common/GLViewRenderMode";
 import { GLViewController } from "./GLViewController";
 import { ViewController } from "./ViewController";
 

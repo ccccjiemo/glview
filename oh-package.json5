@@ -1,6 +1,6 @@
 {
   "name": "@jemoc/glview",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "组建结合egl和opengl es能力，可以在arkTs侧进行opengl渲染绘制",
   "keywords": [
     "opengl",
@@ -9,12 +9,13 @@
     "xComponent"
   ],
   "homepage": "https://github.com/ccccjiemo/glview.git",
+  "types": "type/Index.d.ets",
   "main": "Index.ets",
   "author": "ccccjiemo",
   "repository": "https://github.com/ccccjiemo/glview.git",
   "license": "Apache-2.0",
   "dependencies": {
-    "@jemoc/egl": 'file:../egl',
-    "@jemoc/gles": 'file:../gles'
+    "@jemoc/egl": '0.2.1',
+    "@jemoc/gles": '0.2.4'
   }
 }

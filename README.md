@@ -42,9 +42,9 @@ GLView({ options: { controller: GLViewController, eglContextClientVersion: numbe
 
 组件Surface销毁时调用此方法，开发者需要在此方法销毁opengl资源
 
-#### onDrawFrame(timestamp: number, targetTimeStamp: number): void
+#### onDrawFrame(timestamp: number, targetTimeStamp: number): boolean
 
-组件绘制每一帧都会调用此方法
+组件绘制每一帧都会调用此方法,通过返回值影响是否swapBuffer
 
 #### setEGLContextClientVersion(version: number): void
 
@@ -62,6 +62,43 @@ GLView({ options: { controller: GLViewController, eglContextClientVersion: numbe
 
 交换前缓冲区和后缓冲区
 
+#### 1.1.0版本暂时可以在controller内部获取eglSurface、eglDisplay、eglContext、eglConfig。后续会提供自定义egl初始化
+
+---
+
+## GLView2
+
+### 接口
+
+```typescript
+GLView2({
+  options: {
+    controller: GLController,
+    eglContextClientVersion: number,
+    renderMode: GLViewRenderMode,
+    render: GLRender
+  }
+})
+```
+
+| 参数名                     | 类型               | 必填 | 说明                                                                      |
+|-------------------------|------------------|----|-------------------------------------------------------------------------|
+| controller              | GLController     | 否  | 与GLViewController不同，仅提供setRenderMode、requestRender等方法                   |
+| eglContextClientVersion | number           | 否  | 设置egl context client版本，默认值2                                             |
+| renderMode              | GLViewRenderMode | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                |
+| render                  | GLRender         | 否  | 需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
+
+### GLRender
+
+GLRender继承自”lang.ISendable“，使得渲染任务在Worker中完成。onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame等方法见GLViewController说明
+
+
+---
+
+## GLView和GLView2区别
+
+GLView2使用worker实现，不阻塞UI线程。简单绘制使用GLView方便，GLView2需要sendable支持
+
 ---
 
 ### 下载安装
@@ -72,24 +109,46 @@ ohpm install @jemoc/glview
 
 ### 示例
 
+```typescript
+const vertexShaderSource: string =
+  `#version 300 es
+        layout(location = 0) in vec3 a_position;
+        layout(location = 1) in vec3 a_color;
+        out vec4 v_color;
+        void main()
+        {
+            gl_Position = vec4(a_position, 1.0);
+            v_color = vec4(a_color, 1.0);
+        }`;
+const fragmentShaderSource: string =
+  `#version 300 es
+     precision mediump float;
+      out vec4 fragColor;
+      in vec4 v_color;
+      void main()
+      {
+          fragColor = v_color;
+      }`;
+
+const vertex_list: Float32Array = new Float32Array([
+  -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
+  0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
+  0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
+  -0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+]);
+```
+
 #### 实现GLViewController
 
 ```typescript
 import { GLViewController, gles } from '@jemoc/glview'
 
+//gles使用案例见@jemoc/gles
+
 class MyController extends GLViewController {
-  private program: number = 0;
-  private vao: number = 0;
-  private vbo: number = 0
-
-  //nativeImage: gles.NativeImage;
-
-  // constructor() {
-  //   super();
-  //   //使用NativeImage同层渲染或渲染视频帧
-  //   //详细用法见@jemoc/gles
-  //   this.nativeImage = new gles.NativeImage();
-  // }
+  private program?: gles.Program;
+  private vao?: gles.VertexArray;
+  private vbo?: gles.Buffer;
 
   onSurfaceChanged(rect: SurfaceRect): void {
     gles.glViewport(0, 0, rect.surfaceWidth, rect.surfaceHeight);
@@ -103,103 +162,31 @@ class MyController extends GLViewController {
   }
 
   onSurfaceCreated(): void {
-    //创建shader
-    let vertexShaderSource =
-      `version 300 es
-        layout(location = 0) in vec4 a_position;
-        layout(location = 1) in vec4 a_color;
-        out vec4 v_color;
-        void main()
-        {
-            gl_Position = a_position;
-            v_color = a_color;
-        }`;
-
-    let fragmentShaderSource =
-      `#version 300 es
-      precision mediump float;
-      in vec4 v_color;
-      out vec4 fragColor;
-      {
-          fragColor = v_color;
-      }`;
-
-    let vertexShader = gles.glCreateShader(gles.GL_VERTEX_SHADER);
-    let fragmentShader = gles.glCreateShader(gles.GL_FRAGMENT_SHADER);
-    let program = gles.glCreateProgram();
-    gles.glShaderSource(vertexShader, vertexShaderSource);
-    gles.glCompileShader(vertexShader);
-    let result = gles.glGetShaderiv(vertexShader, gles.GL_COMPILE_STATUS);
-
-
-    if (!result) {
-      let info = gles.glGetShaderInfoLog(vertexShader);
-      console.log(info);
+    this.program = new gles.Program();
+    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, this.vertexShaderSource);
+    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, this.fragmentShaderSource);
+    if (!program.attach(vertexShader, fragmentShader)) {
+      throw Error('compile program fail')
     }
-    gles.glShaderSource(fragmentShader, fragmentShaderSource);
-    gles.glCompileShader(vertexShader);
-    result = gles.glGetShaderiv(fragmentShader, gles.GL_COMPILE_STATUS);
-    if (!result) {
-      let info = gles.glGetShaderInfoLog(fragmentShader);
-      console.log(info);
-    }
-    gles.glAttachShader(program, vertexShader);
-    gles.glAttachShader(program, fragmentShader);
-    gles.glLinkProgram(program);
-    let status = gles.glGetProgramiv(program, gles.GL_LINK_STATUS);
-    if (!status) {
-      let info = gles.glGetProgramInfoLog(program);
-      console.log(info);
-    }
-    gles.glDeleteShader(vertexShader);
-    gles.glDeleteShader(fragmentShader);
-
+    //program.detach(vertexShader, fragmentShader);
+    this.vao = new gles.VertexArray();
+    this.vbo = new gles.Buffer(gles.GL_ARRAY_BUFFER);
+    vbo.setData(this.vertex_list, gles.GL_STATIC_DRAW);
+    vao.setBuffer(vbo, 0, 3, gles.GL_FLOAT, false, 24, 0);
+    vao.enable(0);
+    vao.setBuffer(vbo, 1, 3, gles.GL_FLOAT, false, 24, 12);
+    vao.enable(1);
+    vao.unbind();
     this.program = program;
-
-    let vertex_list = new Float32Array([
-      -0.5, -0.5, 0.0,
-      0.5, -0.5, 0.0,
-      0.0, 0.5, 0.0
-    ]);
-
-    //创建vao vbo
-    let vao_list = gles.glGenVertexArrays(1);
-    let bufs = gles.glGenBuffers(1);
-    let vao = vao_list[0];
-    let vbo = bufs[0];
-    gles.glBindBuffer(gles.GL_ARRAY_BUFFER, vbo);
-    gles.glBindVertexArray(vao);
-    gles.glBindBuffer(gles.GL_ARRAY_BUFFER, vbo);
-    gles.glBufferData(gles.GL_ARRAY_BUFFER, vertex_list.buffer, gles.GL_STATIC_DRAW);
-
-    gles.glVertexAttribPointer(0, 3, gles.GL_FLOAT, gles.GL_FALSE, 12, 0);
-    gles.glEnableVertexAttribArray(0);
-
-    this.vbo = vbo;
     this.vao = vao;
+    this.vbo = vbo;
   }
 
   onDrawFrame(timestamp: number, targetTimestamp: number): void {
-    // 更新NativeImage
-    // if (this.nativeImage.isAvailable) {
-    //   if (this.nativeImage.textureId == -1) {
-    //     this.texture = new gles.Texture(gles.TextureTarget.GL_TEXTURE_EXTERNAL_OES);
-    //     this.texture
-    //       .setParameter(gles.GL_TEXTURE_WRAP_S, gles.GL_REPEAT)
-    //       .setParameter(gles.GL_TEXTURE_WRAP_T, gles.GL_REPEAT)
-    //       .setParameter(gles.GL_TEXTURE_MIN_FILTER, gles.GL_LINEAR)
-    //       .setParameter(gles.GL_TEXTURE_MAG_FILTER, gles.GL_LINEAR)
-    //     let error = this.nativeImage.attachContext(this.texture.id);
-    //   }
-    //   let error = this.nativeImage.updateSurfaceImage();
-    // }
-
     gles.glClearColor(0.6, 0.6, 0.6, 1.0);
     gles.glClear(gles.GL_COLOR_BUFFER_BIT | gles.GL_DEPTH_BUFFER_BIT);
-    gles.glUseProgram(this.program);
-    gles.glBindVertexArray(this.vao);
-    gles.glDrawArrays(gles.GL_TRIANGLES, 0, 3);
-
+    this.program?.bind();
+    this.vao?.glDrawArrays(gles.GL_TRIANGLES, 0, 3);
   }
 }
 ```
@@ -226,4 +213,99 @@ struct Index {
 }
 ```
 
-![img.png](src/assett/test.png)
+### GLView2示例
+#### 实现GLRender
+```typescript
+@Sendable
+class MyRender implements GLRender {
+  private vbo?: gles.Buffer2;
+  private vao?: gles.VertexArray2;
+  private program?: gles.Program2;
+  private vertexShaderSource: string =
+    `#version 300 es
+        layout(location = 0) in vec3 a_position;
+        layout(location = 1) in vec3 a_color;
+        out vec4 v_color;
+        void main()
+        {
+            gl_Position = vec4(a_position, 1.0);
+            v_color = vec4(a_color, 1.0);
+        }`;
+  private fragmentShaderSource: string =
+    `#version 300 es
+     precision mediump float;
+      out vec4 fragColor;
+      in vec4 v_color;
+      void main()
+      {
+          fragColor = v_color;
+      }`;
+  private vertex_list: collections.Float32Array = new collections.Float32Array([
+    -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
+    0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
+    0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
+    -0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+  ]);
+
+  onSurfaceCreated(): void {
+    let program = new gles.Program2();
+    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, this.vertexShaderSource);
+    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, this.fragmentShaderSource);
+    if (!program.attach(vertexShader, fragmentShader)) {
+      throw Error('compile program fail')
+    }
+    //program.detach(vertexShader, fragmentShader);
+    let vao = new gles.VertexArray2();
+    let vbo = new gles.Buffer2(gles.GL_ARRAY_BUFFER);
+    vbo.setData(this.vertex_list, gles.GL_STATIC_DRAW);
+    vao.setBuffer(vbo, 0, 3, gles.GL_FLOAT, false, 24, 0);
+    vao.enable(0);
+    vao.setBuffer(vbo, 1, 3, gles.GL_FLOAT, false, 24, 12);
+    vao.enable(1);
+    vao.unbind();
+    this.program = program;
+    this.vao = vao;
+    this.vbo = vbo;
+  }
+
+  onSurfaceChanged(width: number, height: number): void {
+  }
+
+  onSurfaceDestroyed(): void {
+    this.program?.delete()
+    this.vao?.delete()
+    this.vbo?.delete()
+  }
+
+  onDrawFrame(timestamp: number, targetTimestamp: number): boolean {
+    gles.glClearColor(0.5, 0.5, 0.9, 1.0);
+    gles.glClear(gles.GL_COLOR_BUFFER_BIT | gles.GL_DEPTH_BUFFER_BIT);
+    this.program?.bind();
+    this.vao?.drawArrays(gles.GL_TRIANGLES, 0, 3);
+    this.vao?.unbind();
+    return true;
+  }
+}
+```
+
+```text
+@Component
+struct Index {
+  private render: MyRender = new MyRender();
+  private controller: GLController = new GLController();
+  @State renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
+  
+  //this.controller.requestRender();
+  build() {
+    Column() {
+       GLView2({
+          controller: this.controller,
+          render: this.render,
+          renderMode: this.renderMode,
+       })
+    }
+  }
+}
+```
+
+![img.png](img.png)

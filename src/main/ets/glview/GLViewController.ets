@@ -1,14 +1,14 @@
 import { egl } from "@jemoc/egl";
 import { displaySync } from "@kit.ArkGraphics2D";
-import { GLViewRenderMode } from "./GLViewRenderMode";
-import { DOMAIN, TAG } from './common'
+import { GLViewRenderMode } from "../common/GLViewRenderMode";
+import { DOMAIN, TAG } from '../common/constants'
 import { hilog } from "@kit.PerformanceAnalysisKit";
 
 export abstract class GLViewController {
-  private eglDisplay?: egl.EGLDisplay;
-  private eglConfig?: egl.EGLConfig;
-  private eglContext?: egl.EGLContext;
-  private eglSurface?: egl.EGLSurface;
+  eglDisplay?: egl.EGLDisplay;
+  eglConfig?: egl.EGLConfig;
+  eglContext?: egl.EGLContext;
+  eglSurface?: egl.EGLSurface;
   private eglClientVersion: number = 2;
   private renderMode: GLViewRenderMode = GLViewRenderMode.CONTINUOUSLY;
   private vSync?: displaySync.DisplaySync;
