@@ -16,7 +16,6 @@ import {
 
 export type CommandType = "Init" | "Start" | "Stop" | "Finish"
 
-"use shared"
 
 @Sendable
 export type SendableCallback<T extends lang.ISendable> = (context: T) => void;

@@ -1,3 +1,4 @@
+import { DefaultExpectedFrameRateRange } from '../common/constants';
 import { GLViewRenderMode } from '../common/GLViewRenderMode';
 import { GLController } from './GLController';
 import { DefaultRender, GLRender } from './GLRender';
@@ -11,7 +12,9 @@ export struct GLView2 {
   render: GLRender = new DefaultRender();
   eglContextClientVersion: EGLContextVersion = 2;
   controller: GLController = new GLController();
+  expectedFrameRateRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
   @Prop @Watch('renderModeChanged') renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
+
 
   renderModeChanged(prop: string) {
     this.controller.setRenderMode(this.renderMode);
@@ -21,6 +24,7 @@ export struct GLView2 {
     this.glThread.setGLController(this.controller);
     this.controller.setRender(this.render);
     this.controller.setEGLContextClientVersion(this.eglContextClientVersion);
+    this.controller.setExpectedFrameRateRange(this.expectedFrameRateRange);
     this.controller.setRenderMode(this.renderMode)
   }
 
@@ -38,6 +42,7 @@ export struct GLView2V2 {
   render: GLRender = new DefaultRender();
   eglContextClientVersion: EGLContextVersion = 2;
   controller: GLController = new GLController();
+  expectedFrameRateRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
   @Param renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
   @Monitor('renderMode')
@@ -52,6 +57,7 @@ export struct GLView2V2 {
   aboutToAppear(): void {
     this.glThread.setGLController(this.controller);
     this.controller.setRender(this.render);
+    this.controller.setExpectedFrameRateRange(this.expectedFrameRateRange);
     this.controller.setEGLContextClientVersion(this.eglContextClientVersion);
     this.controller.setRenderMode(this.renderMode)
   }
