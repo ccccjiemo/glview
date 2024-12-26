@@ -31,6 +31,8 @@ export const COMMAND_SURFACE_DESTROY = "GL_SURFACE_DESTROY"
 
 export const COMMAND_REQUEST_RENDER = "GL_REQUEST_RENDER"
 
+export const COMMAND_EXECUTE = "GL_EXECUTE"
+
 export interface GLThreadMessage {
   type: string;
   message: string;

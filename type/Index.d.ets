@@ -1,6 +1,7 @@
 import { egl } from "@jemoc/egl";
 import { displaySync } from "@kit.ArkGraphics2D";
 import { lang } from "@kit.ArkTS";
+import { SendableCallback } from "../src/main/ets/glview2/GLCommand";
 
 export { gles } from '@jemoc/gles'
 
@@ -85,4 +86,6 @@ export class GLController {
   setEGLContextClientVersion(version: number): void
 
   requestRender(info?: displaySync.IntervalInfo): void
+
+  execute<T extends GLRender>(callback: SendableCallback<T>): void
 }

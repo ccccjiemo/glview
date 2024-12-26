@@ -15,7 +15,7 @@
   "repository": "https://github.com/ccccjiemo/glview.git",
   "license": "Apache-2.0",
   "dependencies": {
-    "@jemoc/egl": '0.2.1',
-    "@jemoc/gles": '0.2.4'
+    "@jemoc/egl": 'file:../egl',
+    "@jemoc/gles": 'file:../gles'
   }
 }

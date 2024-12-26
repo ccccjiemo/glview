@@ -7,7 +7,9 @@ import {
   MESSAGE_GL_FINISH
 } from "../common/GLThreadMessage";
 import {
+  ExecuteCommand,
   RequestRenderCommand,
+  SendableCallback,
   SetEGLContextClientVersionCommand,
   SetRenderCommand,
   SetRenderModeCommand,
@@ -26,6 +28,12 @@ export class GLController {
 
   init() {
     this.worker = new worker.ThreadWorker('../workers/GLThread.ets');
+
+    this.vSync.setExpectedFrameRateRange({
+      min: 0,
+      max: 30,
+      expected: 30
+    })
 
     this.vSync.on('frame', (t) => {
       this.worker?.postMessageWithSharedSendable(new RequestRenderCommand(t));
@@ -98,4 +106,9 @@ export class GLController {
     }
     this.worker?.postMessageWithSharedSendable(new RequestRenderCommand(info));
   }
+
+  execute<T extends GLRender>(callback: SendableCallback<T>) {
+    this.worker?.postMessageWithSharedSendable(new ExecuteCommand<T>(callback))
+  }
 }
+

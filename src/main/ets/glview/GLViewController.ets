@@ -1,8 +1,8 @@
-import { egl } from "@jemoc/egl";
 import { displaySync } from "@kit.ArkGraphics2D";
 import { GLViewRenderMode } from "../common/GLViewRenderMode";
 import { DOMAIN, TAG } from '../common/constants'
 import { hilog } from "@kit.PerformanceAnalysisKit";
+import { egl } from "@jemoc/egl";
 
 export abstract class GLViewController {
   eglDisplay?: egl.EGLDisplay;
@@ -26,7 +26,6 @@ export abstract class GLViewController {
   setEGLContextClientVersion(version: number) {
     this.eglClientVersion = version;
   }
-
 
 
   /* getEGLConfig(): egl.EGLConfig {
@@ -148,11 +147,12 @@ export abstract class GLViewController {
       this.swapBuffer();
     }
 
+
   }
 
   private eglDestroy(): void {
-    this.eglDisplay?.destroyContext(this.eglContext);
-    this.eglDisplay?.destroySurface(this.eglSurface);
+    this.eglDisplay?.destroyContext(this.eglContext!);
+    this.eglDisplay?.destroySurface(this.eglSurface!);
     egl.eglReleaseThread();
     this.eglDisplay?.terminate();
   }
@@ -165,7 +165,7 @@ export abstract class GLViewController {
 
   swapBuffer(): void {
     hilog.debug(DOMAIN, TAG, 'swapBuffer');
-    this.eglDisplay?.swapBuffers(this.eglSurface);
+    this.eglDisplay?.swapBuffers(this.eglSurface!);
   }
 
   private eglInit(surfaceId: string): void {
