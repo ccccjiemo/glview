@@ -4,6 +4,7 @@ import { GLViewRenderMode } from "../common/GLViewRenderMode";
 import { GLRender } from "./GLRender";
 import { displaySync } from "@kit.ArkGraphics2D";
 import {
+  COMMAND_EXECUTE,
   COMMAND_REQUEST_RENDER,
   COMMAND_SET_EGLCONTEXT_CLIENT_VERSION,
   COMMAND_SET_RENDER,
@@ -14,6 +15,11 @@ import {
 } from "../common/GLThreadMessage";
 
 export type CommandType = "Init" | "Start" | "Stop" | "Finish"
+
+"use shared"
+
+@Sendable
+export type SendableCallback<T extends lang.ISendable> = (context: T) => void;
 
 @Sendable
 export class InitParam implements lang.ISendable {
@@ -50,7 +56,7 @@ export class TimeStamp {
   }
 }
 
-export interface GLCommand<T extends lang.ISendable> extends lang.ISendable {
+export interface GLCommand<T extends lang.ISendable = ESObject> extends lang.ISendable {
   type: string;
   data: T
 }
@@ -145,5 +151,15 @@ export class RequestRenderCommand implements GLCommand<TimeStamp> {
 
   constructor(info?: displaySync.IntervalInfo) {
     this.data = new TimeStamp(info);
+  }
+}
+
+@Sendable
+export class ExecuteCommand<T extends GLRender> implements GLCommand<SendableCallback<T>> {
+  type: string = COMMAND_EXECUTE;
+  data: SendableCallback<T>;
+
+  constructor(callback: SendableCallback<T>) {
+    this.data = callback;
   }
 }

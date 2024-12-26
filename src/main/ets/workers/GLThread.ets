@@ -1,7 +1,7 @@
 import { ArkTSUtils, ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, worker } from '@kit.ArkTS';
-import { displaySync } from '@kit.ArkGraphics2D';
 import { egl } from '@jemoc/egl';
 import {
+  COMMAND_EXECUTE,
   COMMAND_REQUEST_RENDER,
   COMMAND_SET_EGLCONTEXT_CLIENT_VERSION,
   COMMAND_SET_RENDER,
@@ -15,13 +15,13 @@ import {
 } from '../common/GLThreadMessage';
 import { GLViewRenderMode } from '../common/GLViewRenderMode';
 import { GLRender } from '../glview2/GLRender';
-import { Rect } from '../glview2/GLCommand'
+import { GLCommand, Rect, SendableCallback } from '../glview2/GLCommand'
+import { GLCommandQueue } from './GLCommandQueue';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { GL_Thread_Domain, GL_Thread_Tag } from '../common/constants';
 
-
-console.log('worker start')
-
+let commandQueue: GLCommandQueue = new GLCommandQueue();
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
-const vSync: displaySync.DisplaySync = displaySync.create();
 let eglDisplay: egl.EGLDisplay | undefined;
 let eglConfig: egl.EGLConfig | undefined;
 let eglContext: egl.EGLContext | undefined;
@@ -29,7 +29,6 @@ let eglSurface: egl.EGLSurface | undefined;
 let glRender: GLRender | undefined;
 let eglContextClientVersion = 2;
 let RenderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
-const lock = new ArkTSUtils.locks.AsyncLock();
 
 
 /**
@@ -39,32 +38,36 @@ const lock = new ArkTSUtils.locks.AsyncLock();
  * @param e message data
  */
 workerPort.onmessage = (e: MessageEvents) => {
-  switch (e.data.type) {
-    case "Init":
-      initGL(e.data.data);
-      break;
-    case COMMAND_SET_RENDER:
-      setRender(e.data.data);
-      break;
-    case COMMAND_SET_EGLCONTEXT_CLIENT_VERSION:
-      setEGLContextClientVersion(e.data.data);
-      break;
-    case COMMAND_SET_RENDER_MODE:
-      setRenderMode(e.data.data);
-      break;
-    case COMMAND_SURFACE_CREATED:
-      initGL(e.data.data);
-      break;
-    case COMMAND_SURFACE_CHANGED:
-      surfaceChanged(e.data.data);
-      break;
-    case COMMAND_SURFACE_DESTROY:
-      surfaceDestroy();
-      break;
-    case COMMAND_REQUEST_RENDER:
-      requestRender(e.data.data.timestamp, e.data.data.targetTimeStamp);
-      break;
-  }
+  commandQueue.push(e.data);
+  // switch (e.data.type) {
+  //   case "Init":
+  //     initGL(e.data.data);
+  //     break;
+  //   case COMMAND_SET_RENDER:
+  //     setRender(e.data.data);
+  //     break;
+  //   case COMMAND_SET_EGLCONTEXT_CLIENT_VERSION:
+  //     setEGLContextClientVersion(e.data.data);
+  //     break;
+  //   case COMMAND_SET_RENDER_MODE:
+  //     setRenderMode(e.data.data);
+  //     break;
+  //   case COMMAND_SURFACE_CREATED:
+  //     initGL(e.data.data);
+  //     break;
+  //   case COMMAND_SURFACE_CHANGED:
+  //     surfaceChanged(e.data.data);
+  //     break;
+  //   case COMMAND_SURFACE_DESTROY:
+  //     surfaceDestroy();
+  //     break;
+  //   case COMMAND_REQUEST_RENDER:
+  //     requestRender(e.data.data.timestamp, e.data.data.targetTimeStamp);
+  //     break;
+  //   case COMMAND_EXECUTE:
+  //     execute(e.data.data);
+  //     break;
+  // }
 
 }
 
@@ -154,12 +157,10 @@ const setRenderMode = (mode: number): void => {
   RenderMode = mode;
 }
 
-const surfaceChanged = (rect: Rect): void => {
-  lock.lockAsync(() => {
-    if (makeCurrent()) {
-      glRender?.onSurfaceChanged(rect.width, rect.height);
-    }
-  }, ArkTSUtils.locks.AsyncLockMode.EXCLUSIVE)
+const surfaceChanged = async (rect: Rect): Promise<void> => {
+  if (makeCurrent()) {
+    glRender?.onSurfaceChanged(rect.width, rect.height);
+  }
 }
 
 const surfaceDestroy = (): void => {
@@ -172,36 +173,53 @@ const surfaceDestroy = (): void => {
   workerPort.postMessage({ type: MESSAGE_GL_FINISH })
 }
 
-const requestRender = (timestamp: number, targetTimestamp: number): void => {
-  lock.lockAsync(() => {
-    if (makeCurrent()) {
-      if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
-        eglDisplay?.swapBuffers(eglSurface);
-      }
+const requestRender = async (timestamp: number, targetTimestamp: number): Promise<void> => {
+  if (makeCurrent()) {
+    if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
+      eglDisplay?.swapBuffers(eglSurface);
     }
-  }, ArkTSUtils.locks.AsyncLockMode.EXCLUSIVE)
+  }
+}
+
+const execute = async (callback: SendableCallback<GLRender>): Promise<void> => {
+  if (glRender) {
+    if (makeCurrent()) {
+      callback(glRender);
+    }
+  }
 
 }
 
-const doRender = (timestamp: number, targetTimestamp: number): void => {
-  setTimeout(() => {
-    if (makeCurrent()) {
-      if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
-        eglDisplay?.swapBuffers(eglSurface);
-      }
-    }
-  })
-
-  // console.log(`worker ${timestamp}`);
-  // lock.lockAsync(() => {
-  //   if (makeCurrent()) {
-  //     if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
-  //       eglDisplay?.swapBuffers(eglSurface);
-  //     }
-  //   }
-  //   console.log('worker draw finish')
-  // }, ArkTSUtils.locks.AsyncLockMode.EXCLUSIVE)
-}
+commandQueue.onCommand((command: GLCommand, callback: Callback<void>) => {
+  hilog.debug(GL_Thread_Domain, GL_Thread_Tag, "execute command type: %{public}s", command.type);
+  switch (command.type) {
+    case COMMAND_SET_RENDER:
+      setRender(command.data);
+      break;
+    case COMMAND_SET_EGLCONTEXT_CLIENT_VERSION:
+      setEGLContextClientVersion(command.data);
+      break;
+    case COMMAND_SET_RENDER_MODE:
+      setRenderMode(command.data);
+      break;
+    case COMMAND_SURFACE_CREATED:
+      initGL(command.data);
+      break;
+    case COMMAND_SURFACE_CHANGED:
+      surfaceChanged(command.data);
+      break;
+    case COMMAND_SURFACE_DESTROY:
+      surfaceDestroy();
+      break;
+    case COMMAND_REQUEST_RENDER:
+      requestRender(command.data.timestamp, command.data.targetTimeStamp);
+      break;
+    case COMMAND_EXECUTE:
+      execute(command.data);
+      break;
+  }
+  callback();
+})
 
 
 
