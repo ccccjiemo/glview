@@ -1,4 +1,4 @@
-import { MessageEvents, worker } from "@kit.ArkTS";
+import { ErrorEvent, MessageEvents, worker } from "@kit.ArkTS";
 import { GLViewRenderMode } from "../common/GLViewRenderMode";
 import {
   GLThreadMessage,
@@ -19,21 +19,19 @@ import {
 } from "./GLCommand";
 import { GLRender } from "./GLRender";
 import { displaySync } from "@kit.ArkGraphics2D";
+import { DefaultExpectedFrameRateRange } from "../common/constants";
 
 export class GLController {
   private worker?: worker.ThreadWorker;
   private mode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
   private vSync: displaySync.DisplaySync = displaySync.create();
   private isInit: boolean = false;
+  private expectedFrameRateRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
 
   init() {
     this.worker = new worker.ThreadWorker('../workers/GLThread.ets');
 
-    this.vSync.setExpectedFrameRateRange({
-      min: 0,
-      max: 30,
-      expected: 30
-    })
+    this.vSync.setExpectedFrameRateRange(this.expectedFrameRateRange)
 
     this.vSync.on('frame', (t) => {
       this.worker?.postMessageWithSharedSendable(new RequestRenderCommand(t));
@@ -59,11 +57,20 @@ export class GLController {
           break;
       }
     }
+
+    this.worker.onerror = (error: ErrorEvent) => {
+      this.destroy();
+    }
   }
 
   destroy() {
+    this.vSync.stop();
     this.worker?.terminate();
     this.worker = undefined;
+  }
+
+  setExpectedFrameRateRange(range: ExpectedFrameRateRange) {
+    this.expectedFrameRateRange = range;
   }
 
   setRender(render: GLRender): void {
@@ -102,6 +109,9 @@ export class GLController {
 
   requestRender(info?: displaySync.IntervalInfo) {
     if (this.mode != GLViewRenderMode.WHEN_DIRTY) {
+      return;
+    }
+    if (!this.isInit) {
       return;
     }
     this.worker?.postMessageWithSharedSendable(new RequestRenderCommand(info));

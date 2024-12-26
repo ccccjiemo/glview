@@ -157,7 +157,7 @@ const setRenderMode = (mode: number): void => {
   RenderMode = mode;
 }
 
-const surfaceChanged = async (rect: Rect): Promise<void> => {
+const surfaceChanged = (rect: Rect): void=> {
   if (makeCurrent()) {
     glRender?.onSurfaceChanged(rect.width, rect.height);
   }
@@ -173,7 +173,7 @@ const surfaceDestroy = (): void => {
   workerPort.postMessage({ type: MESSAGE_GL_FINISH })
 }
 
-const requestRender = async (timestamp: number, targetTimestamp: number): Promise<void> => {
+const requestRender =  (timestamp: number, targetTimestamp: number): void => {
   if (makeCurrent()) {
     if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
       eglDisplay?.swapBuffers(eglSurface);
@@ -181,7 +181,7 @@ const requestRender = async (timestamp: number, targetTimestamp: number): Promis
   }
 }
 
-const execute = async (callback: SendableCallback<GLRender>): Promise<void> => {
+const execute =  (callback: SendableCallback<GLRender>): void=> {
   if (glRender) {
     if (makeCurrent()) {
       callback(glRender);

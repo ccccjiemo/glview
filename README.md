@@ -4,7 +4,30 @@
 
 ## 简单介绍
 
-GLView组件可以在arkTs侧进行opengl和egl操作。支持按需渲染和连续渲染
+GLView组件可以在arkTs侧进行opengl和egl操作。支持按需渲染和连续渲染。 GLView2使用worker实现
+
+---
+
+### 下载安装
+
+```shell
+ohpm install @jemoc/glview
+```
+
+api12需要在工程级build-profile.json5中修改配置 (
+详细)[https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V13/arkts-sendable-V13#sendable-function]
+
+```json
+{
+  "app": {
+    "products": [
+      {
+        "compatibleSdkVersionStage": "beta3"
+      }
+    ]
+  }
+}
+```
 
 ## GLView
 
@@ -81,12 +104,44 @@ GLView2({
 })
 ```
 
-| 参数名                     | 类型               | 必填 | 说明                                                                      |
-|-------------------------|------------------|----|-------------------------------------------------------------------------|
-| controller              | GLController     | 否  | 与GLViewController不同，仅提供setRenderMode、requestRender等方法                   |
-| eglContextClientVersion | number           | 否  | 设置egl context client版本，默认值2                                             |
-| renderMode              | GLViewRenderMode | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                |
-| render                  | GLRender         | 否  | 需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
+| 参数名                     | 类型                     | 必填 | 说明                                                                      |
+|-------------------------|------------------------|----|-------------------------------------------------------------------------|
+| controller              | GLController           | 否  | 与GLViewController不同，仅提供setRenderMode、requestRender等方法                   |
+| eglContextClientVersion | number                 | 否  | 设置egl context client版本，默认值2                                             |
+| renderMode              | GLViewRenderMode       | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                |
+| render                  | GLRender               | 否  | 需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
+| expectedFrameRateRange  | ExpectedFrameRateRange | 否  | vSync期望帧率                                                               |
+
+### GLController
+
+#### setEGLContextClientVersion(version: number): void
+
+设置egl context client版本。此方法需要在onSurfaceCreated前使用。此方法与组件接口eglContextClientVersion冲突。
+
+#### setRenderMode(mode: GLViewRenderMode):void
+
+更改组件渲染模式
+
+#### requestRender():void
+
+WHEN_DIRTY模式下请求绘制一帧
+
+#### execute<T extends GLRender>(callback: SendableCallback<T>)
+
+发送一个@Sendable装饰的function。此方法下提供egl环境
+
+```typescript
+//例如使用execute方法来更新NativeImage
+@Sendable
+function updateNativeImage(render: MyRender) { //MyRender是自实现GLRender类，
+  render.nativeImage.updateSurfaceImage();
+}
+
+//虽然官方文档说不可在listener中调用NativeImage其他方法，但更新请求需要发送到worker中，不就等于是异步执行了
+nativeImage.setOnFrameAvailableListener(() => {
+  glController.execute(updateFrame) //glController是GLController的实例
+})
+```
 
 ### GLRender
 
@@ -100,12 +155,6 @@ GLRender继承自”lang.ISendable“，使得渲染任务在Worker中完成。o
 GLView2使用worker实现，不阻塞UI线程。简单绘制使用GLView方便，GLView2需要sendable支持
 
 ---
-
-### 下载安装
-
-```shell
-ohpm install @jemoc/glview
-```
 
 ### 示例
 
@@ -214,50 +263,27 @@ struct Index {
 ```
 
 ### GLView2示例
+
 #### 实现GLRender
+
 ```typescript
 @Sendable
 class MyRender implements GLRender {
   private vbo?: gles.Buffer2;
   private vao?: gles.VertexArray2;
   private program?: gles.Program2;
-  private vertexShaderSource: string =
-    `#version 300 es
-        layout(location = 0) in vec3 a_position;
-        layout(location = 1) in vec3 a_color;
-        out vec4 v_color;
-        void main()
-        {
-            gl_Position = vec4(a_position, 1.0);
-            v_color = vec4(a_color, 1.0);
-        }`;
-  private fragmentShaderSource: string =
-    `#version 300 es
-     precision mediump float;
-      out vec4 fragColor;
-      in vec4 v_color;
-      void main()
-      {
-          fragColor = v_color;
-      }`;
-  private vertex_list: collections.Float32Array = new collections.Float32Array([
-    -0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
-    0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
-    0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
-    -0.5, 0.5, 0.0, 0.0, 0.0, 0.0
-  ]);
 
   onSurfaceCreated(): void {
     let program = new gles.Program2();
-    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, this.vertexShaderSource);
-    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, this.fragmentShaderSource);
+    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, vertexShaderSource);
+    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, fragmentShaderSource);
     if (!program.attach(vertexShader, fragmentShader)) {
       throw Error('compile program fail')
     }
     //program.detach(vertexShader, fragmentShader);
     let vao = new gles.VertexArray2();
     let vbo = new gles.Buffer2(gles.GL_ARRAY_BUFFER);
-    vbo.setData(this.vertex_list, gles.GL_STATIC_DRAW);
+    vbo.setData(vertex_list, gles.GL_STATIC_DRAW);
     vao.setBuffer(vbo, 0, 3, gles.GL_FLOAT, false, 24, 0);
     vao.enable(0);
     vao.setBuffer(vbo, 1, 3, gles.GL_FLOAT, false, 24, 12);
