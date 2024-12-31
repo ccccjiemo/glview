@@ -56,6 +56,7 @@ class EventEmitter {
       if (listener) {
         listener.listener(...args);
         if (listener.once) {
+          this.off(eventName, listener)
         }
       }
     }
@@ -91,6 +92,7 @@ class EventEmitter {
 export class GLCommandQueue extends EventEmitter {
   protected commands: Array<GLCommand> = [];
   private _canExecute: boolean = false;
+  private _last_command: string = '';
 
   constructor() {
     super();
@@ -131,8 +133,9 @@ export class GLCommandQueue extends EventEmitter {
   }
 
   push(data: GLCommand) {
-    this.commands.push(data);
-    this.execute();
+
+      this.commands.push(data);
+      this.execute();
   }
 
   onCommand(callback: (command: GLCommand, callback: Callback<void>) => void) {

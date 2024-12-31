@@ -3,7 +3,7 @@
   "buildOption": {
     "sourceOption": {
       "workers": [
-        './src/main/ets/workers/GLThread.ets'
+        "./src/main/ets/workers/GLWorker.ets"
       ],
     }
   },

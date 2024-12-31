@@ -3,6 +3,8 @@ import { hilog } from "@kit.PerformanceAnalysisKit";
 import { Config_Attrib_list, DOMAIN, TAG } from "../common/constants";
 import { displaySync } from "@kit.ArkGraphics2D";
 import { egl } from '@jemoc/egl';
+import { util } from "@kit.ArkTS";
+
 
 export class GLViewController extends XComponentController {
   private _eglClientVersion: number = 2;
@@ -12,47 +14,43 @@ export class GLViewController extends XComponentController {
   private __config__: egl.EGLConfig | null = null;
   private __surface__: egl.EGLSurface | null = null;
   private __context__: egl.EGLContext | null = null;
+  private _init: boolean = false;
   private _expectedFrameRange: ExpectedFrameRateRange = {
     expected: 60, max: 120, min: 0
   }
 
+
   constructor() {
     super();
     this._vSync = displaySync.create();
+    util.Aspect.addBefore(this.constructor, "onSurfaceCreated", false, (instance: GLViewController) => {
+      if (instance === this) {
+        instance.makeCurrent();
+      }
+    })
+    util.Aspect.addAfter(this.constructor, "onSurfaceCreated", false, (instance: GLViewController) => {
+      if (instance === this) {
+        instance.start();
+      }
+    })
+    util.Aspect.addAfter(this.constructor, "onSurfaceDestroyed", false, (instance: GLViewController) => {
+      if (instance === this) {
+        instance.stop();
+      }
+    })
   }
 
   onSurfaceCreated(surfaceId: string): void {
-    this.makeCurrent();
-    this.onCreated();
-    this._vSync.setExpectedFrameRateRange(this._expectedFrameRange);
-    this._vSync.on('frame', (data) => {
-      if (this.makeCurrent()) {
-        this.onDrawFrame(data.timestamp, data.targetTimestamp);
-        this.swapBuffer();
-      }
-      if (this._mode == GLViewRenderMode.WHEN_DIRTY) {
-        this._vSync.stop();
-      }
-    })
-
-    //异步，让onSurfaceChanged先执行
-    setTimeout(() => {
-      this._vSync.start();
-    })
   }
 
   onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void {
-    this.makeCurrent();
-    this.onChanged(rect);
   }
 
   onSurfaceDestroyed(surfaceId: string): void {
-    this.makeCurrent();
-    this.onDestroy();
-    this.eglDisplay.destroySurface(this.eglSurface);
-    this.eglDisplay.destroyContext(this.eglContext);
-    this.eglDisplay.terminate();
-    egl.eglReleaseThread();
+  }
+
+  protected onDrawFrame(timestamp: number, targetTimestamp: number): boolean {
+    return false;
   }
 
   setEGLContextClientVersion(version: number) {
@@ -61,6 +59,15 @@ export class GLViewController extends XComponentController {
 
   setExpectedFrameRateRange(range: ExpectedFrameRateRange) {
     this._expectedFrameRange = range;
+    if (this._init) {
+      if (this._mode == GLViewRenderMode.CONTINUOUSLY) {
+        this._vSync.stop();
+        this._vSync.setExpectedFrameRateRange(range);
+        this._vSync.start();
+      } else {
+        this._vSync.setExpectedFrameRateRange(range);
+      }
+    }
   }
 
   setRenderMode(mode: GLViewRenderMode): void {
@@ -71,6 +78,12 @@ export class GLViewController extends XComponentController {
     this._mode = mode;
   }
 
+  requestRender() {
+    if (this._mode == GLViewRenderMode.WHEN_DIRTY && this._init) {
+      this._vSync.start();
+    }
+  }
+
   protected makeCurrent(): boolean {
     return this.eglDisplay.makeCurrent(this.eglSurface, this.eglSurface, this.eglContext);
   }
@@ -79,20 +92,33 @@ export class GLViewController extends XComponentController {
     this.eglDisplay.swapBuffers(this.eglSurface);
   }
 
-  protected onDrawFrame(timestamp: number, targetTimestamp: number): void {
+  protected start() {
+    this._vSync.setExpectedFrameRateRange(this._expectedFrameRange);
+    this._vSync.on('frame', (data) => {
+      if (this.makeCurrent()) {
+        if (this.onDrawFrame(data.timestamp, data.targetTimestamp)) {
+          this.swapBuffer();
+        }
+      }
+      if (this._mode == GLViewRenderMode.WHEN_DIRTY) {
+        this._vSync.stop();
+      }
+    })
 
+    //异步，让onSurfaceChanged先执行
+    setTimeout(() => {
+      this._vSync.start();
+      this._init = true;
+    })
   }
 
-  protected onCreated() {
-
-  }
-
-  protected onChanged(rect: SurfaceRect) {
-
-  }
-
-  protected onDestroy() {
-
+  protected stop() {
+    this._vSync.stop();
+    this.makeCurrent();
+    this.eglDisplay.destroySurface(this.eglSurface);
+    this.eglDisplay.destroyContext(this.eglContext);
+    this.eglDisplay.terminate();
+    egl.eglReleaseThread();
   }
 
   protected get eglDisplay(): egl.EGLDisplay {

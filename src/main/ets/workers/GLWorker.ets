@@ -20,15 +20,18 @@ import { GLCommand, InitParam, Rect, SendableCallback } from '../glview2/GLComma
 import { GLCommandQueue } from './GLCommandQueue';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { GL_Thread_Domain, GL_Thread_Tag } from '../common/constants';
+import { EGLFactory } from '../glview2/EGLFactory';
 
 let commandQueue: GLCommandQueue = new GLCommandQueue();
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 let eglDisplay: egl.EGLDisplay | undefined;
-let eglConfig: egl.EGLConfig | undefined;
-let eglContext: egl.EGLContext | undefined;
-let eglSurface: egl.EGLSurface | undefined;
+// let eglConfig: egl.EGLConfig | undefined;
+// let eglContext: egl.EGLContext | undefined;
+// let eglSurface: egl.EGLSurface | undefined;
 let glRender: GLRender | undefined;
+let eglFactory: EGLFactory | null = null;
 let eglContextClientVersion = 2;
+let surfaceId: string = ''
 
 
 /**
@@ -59,99 +62,103 @@ workerPort.onmessageerror = (e: MessageEvents) => {
 workerPort.onerror = (e: ErrorEvent) => {
 }
 
-const makeCurrent = (): boolean => {
-  return Boolean(eglDisplay?.makeCurrent(eglSurface, eglSurface, eglContext));
+function makeCurrent(): boolean {
+  return getDisplay().makeCurrent(getSurface(), getSurface(), getContext());
 }
+//
+// const initGL = (surfaceId: string): void => {
+//   try {
+//     eglDisplay = egl.EGLDisplay.getDisplay();
+//
+//     //判断egl显示设备是否正常
+//     if (!eglDisplay) {
+//       throw new Error("eglGetDisplay failed");
+//     }
+//
+//     //获取egl的主次版本号
+//     if (!eglDisplay.initialize()) {
+//       throw new Error("eglInitialize failed");
+//     }
+//
+//     let attrib_list = [
+//       egl.EGL_RED_SIZE, 8,
+//       egl.EGL_BLUE_SIZE, 8,
+//       egl.EGL_GREEN_SIZE, 8,
+//       egl.EGL_SURFACE_TYPE, egl.EGL_WINDOW_BIT,
+//       egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
+//       egl.EGL_NONE];
+//
+//     eglConfig = eglDisplay.chooseConfig(attrib_list)![0];
+//
+//     if (!eglConfig) {
+//       throw new Error("eglChooseConfig failed");
+//     }
+//
+//     let context_attrib = [egl.EGL_CONTEXT_CLIENT_VERSION, eglContextClientVersion, egl.EGL_NONE];
+//     eglContext = eglDisplay.createContext(eglConfig, egl.EGL_NO_CONTEXT, context_attrib);
+//
+//     if (!eglContext) {
+//       throw new Error("eglCreateContext failed");
+//     }
+//
+//     eglSurface = eglDisplay.createWindowSurface(eglConfig, surfaceId);
+//     if (!eglSurface) {
+//       throw new Error("eglCreateWindowSurface failed");
+//     }
+//
+//     if (makeCurrent()) {
+//       glRender?.onSurfaceCreated();
+//     }
+//   } catch (e) {
+//     workerPort.postMessage({ type: MESSAGE_EGL_INIT_FAILED, message: e })
+//     return;
+//   }
+//
+//   console.log('worker egl init success')
+//   workerPort.postMessage({ type: MESSAGE_EGL_INIT_SUCCESS })
+// }
 
-const initGL = (surfaceId: string): void => {
-  try {
-    eglDisplay = egl.EGLDisplay.getDisplay();
-
-    //判断egl显示设备是否正常
-    if (!eglDisplay) {
-      throw new Error("eglGetDisplay failed");
-    }
-
-    //获取egl的主次版本号
-    if (!eglDisplay.initialize()) {
-      throw new Error("eglInitialize failed");
-    }
-
-    let attrib_list = [
-      egl.EGL_RED_SIZE, 8,
-      egl.EGL_BLUE_SIZE, 8,
-      egl.EGL_GREEN_SIZE, 8,
-      egl.EGL_SURFACE_TYPE, egl.EGL_WINDOW_BIT,
-      egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
-      egl.EGL_NONE];
-
-    eglConfig = eglDisplay.chooseConfig(attrib_list)![0];
-
-    if (!eglConfig) {
-      throw new Error("eglChooseConfig failed");
-    }
-
-    let context_attrib = [egl.EGL_CONTEXT_CLIENT_VERSION, eglContextClientVersion, egl.EGL_NONE];
-    eglContext = eglDisplay.createContext(eglConfig, egl.EGL_NO_CONTEXT, context_attrib);
-
-    if (!eglContext) {
-      throw new Error("eglCreateContext failed");
-    }
-
-    eglSurface = eglDisplay.createWindowSurface(eglConfig, surfaceId);
-    if (!eglSurface) {
-      throw new Error("eglCreateWindowSurface failed");
-    }
-
-    if (makeCurrent()) {
-      glRender?.onSurfaceCreated();
-    }
-  } catch (e) {
-    workerPort.postMessage({ type: MESSAGE_EGL_INIT_FAILED, message: e })
-    return;
-  }
-
-  console.log('worker egl init success')
-  workerPort.postMessage({ type: MESSAGE_EGL_INIT_SUCCESS })
-}
-
-const setRender = (render: GLRender): void => {
+function setRender(render: GLRender): void {
   glRender = render;
 }
 
-const setEGLContextClientVersion = (version: number): void => {
+function setEGLContextClientVersion(version: number): void {
   eglContextClientVersion = version;
 }
 
-const setRenderMode = (mode: number): void => {
-  // RenderMode = mode;
+function surfaceCreated(id: string) {
+  surfaceId = id;
+  if (makeCurrent()) {
+    glRender?.onSurfaceCreated();
+  }
+  workerPort.postMessage({ type: MESSAGE_EGL_INIT_SUCCESS })
+
 }
 
-const surfaceChanged = (rect: Rect): void => {
+function surfaceChanged(rect: Rect): void {
   if (makeCurrent()) {
     glRender?.onSurfaceChanged(rect.width, rect.height);
   }
 }
 
-const surfaceDestroy = (): void => {
+function surfaceDestroy(): void {
   makeCurrent();
   glRender?.onSurfaceDestroyed();
-  eglDisplay?.destroyContext(eglContext!);
-  eglDisplay?.destroySurface(eglSurface!);
+  eglFactory?.destroy(getDisplay())
+  getDisplay().terminate();
   egl.eglReleaseThread();
-  eglDisplay?.terminate();
   workerPort.postMessage({ type: MESSAGE_GL_FINISH })
 }
 
-const requestRender = (timestamp: number, targetTimestamp: number): void => {
+function requestRender(timestamp: number, targetTimestamp: number): void {
   if (makeCurrent()) {
     if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
-      eglDisplay?.swapBuffers(eglSurface!);
+      getDisplay().swapBuffers(getSurface());
     }
   }
 }
 
-const execute = (callback: SendableCallback<GLRender>): void => {
+function execute(callback: SendableCallback<GLRender>): void {
   if (glRender) {
     if (makeCurrent()) {
       callback(glRender);
@@ -160,7 +167,42 @@ const execute = (callback: SendableCallback<GLRender>): void => {
 
 }
 
-const init = (data: InitParam): void => {
+function init(data: InitParam): void {
+  eglContextClientVersion = data.eglContextClientVersion;
+  glRender = data.render;
+  eglFactory = data.eglFactory;
+}
+
+function getDisplay(): egl.EGLDisplay {
+  if (!eglDisplay) {
+    eglDisplay = egl.eglGetDisplay();
+    if (!eglDisplay) {
+      throw Error('egl get display failed');
+    }
+    eglDisplay.initialize();
+  }
+  return eglDisplay;
+}
+
+function getSurface(): egl.EGLSurface {
+  if (!eglFactory) {
+    throw Error('EGLFactory is not exist');
+  }
+  return eglFactory.getSurface(getDisplay(), surfaceId)
+}
+
+function getConfig(): egl.EGLConfig {
+  if (!eglFactory) {
+    throw Error('EGLFactory is not exist');
+  }
+  return eglFactory.getConfig(getDisplay());
+}
+
+function getContext(): egl.EGLContext {
+  if (!eglFactory) {
+    throw Error('EGLFactory is not exist');
+  }
+  return eglFactory.getContext(getDisplay(), eglContextClientVersion);
 }
 
 commandQueue.onCommand((command: GLCommand, callback: Callback<void>) => {
@@ -175,11 +217,8 @@ commandQueue.onCommand((command: GLCommand, callback: Callback<void>) => {
     case COMMAND_SET_EGLCONTEXT_CLIENT_VERSION:
       setEGLContextClientVersion(command.data);
       break;
-    case COMMAND_SET_RENDER_MODE:
-      setRenderMode(command.data);
-      break;
     case COMMAND_SURFACE_CREATED:
-      initGL(command.data);
+      surfaceCreated(command.data);
       break;
     case COMMAND_SURFACE_CHANGED:
       surfaceChanged(command.data);

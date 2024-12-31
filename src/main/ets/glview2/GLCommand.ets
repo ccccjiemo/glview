@@ -5,6 +5,7 @@ import { GLRender } from "./GLRender";
 import { displaySync } from "@kit.ArkGraphics2D";
 import {
   COMMAND_EXECUTE,
+  COMMAND_INIT_WORKER,
   COMMAND_REQUEST_RENDER,
   COMMAND_SET_EGLCONTEXT_CLIENT_VERSION,
   COMMAND_SET_RENDER,
@@ -13,6 +14,7 @@ import {
   COMMAND_SURFACE_CREATED,
   COMMAND_SURFACE_DESTROY
 } from "../common/GLThreadMessage";
+import { EGLFactory } from "./EGLFactory";
 
 export type CommandType = "Init" | "Start" | "Stop" | "Finish"
 
@@ -22,14 +24,14 @@ export type SendableCallback<T extends lang.ISendable> = (context: T) => void;
 
 @Sendable
 export class InitParam implements lang.ISendable {
-  surfaceId: string;
   eglContextClientVersion: number;
   render: GLRender;
+  eglFactory: EGLFactory;
 
-  constructor(surfaceId: string, eglContextClientVersion: number, render: GLRender) {
-    this.surfaceId = surfaceId;
+  constructor(render: GLRender, eglFactory: EGLFactory, eglContextClientVersion: number) {
     this.eglContextClientVersion = eglContextClientVersion;
     this.render = render;
+    this.eglFactory = eglFactory;
   }
 }
 
@@ -62,12 +64,11 @@ export interface GLCommand<T extends lang.ISendable = ESObject> extends lang.ISe
 
 @Sendable
 export class InitCommand implements GLCommand<InitParam> {
-  type: string;
+  type: string = COMMAND_INIT_WORKER;
   data: InitParam;
 
-  constructor(data: InitParam) {
-    this.type = "Init";
-    this.data = data;
+  constructor(render: GLRender, eglFactory: EGLFactory, eglContextClientVersion: number) {
+    this.data = new InitParam(render, eglFactory, eglContextClientVersion);
   }
 }
 
