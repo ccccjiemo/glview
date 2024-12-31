@@ -2,6 +2,7 @@ import { ArkTSUtils, ErrorEvent, MessageEvents, ThreadWorkerGlobalScope, worker 
 import { egl } from '@jemoc/egl';
 import {
   COMMAND_EXECUTE,
+  COMMAND_INIT_WORKER,
   COMMAND_REQUEST_RENDER,
   COMMAND_SET_EGLCONTEXT_CLIENT_VERSION,
   COMMAND_SET_RENDER,
@@ -15,7 +16,7 @@ import {
 } from '../common/GLThreadMessage';
 import { GLViewRenderMode } from '../common/GLViewRenderMode';
 import { GLRender } from '../glview2/GLRender';
-import { GLCommand, Rect, SendableCallback } from '../glview2/GLCommand'
+import { GLCommand, InitParam, Rect, SendableCallback } from '../glview2/GLCommand'
 import { GLCommandQueue } from './GLCommandQueue';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { GL_Thread_Domain, GL_Thread_Tag } from '../common/constants';
@@ -28,7 +29,6 @@ let eglContext: egl.EGLContext | undefined;
 let eglSurface: egl.EGLSurface | undefined;
 let glRender: GLRender | undefined;
 let eglContextClientVersion = 2;
-let RenderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
 
 /**
@@ -39,36 +39,6 @@ let RenderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
  */
 workerPort.onmessage = (e: MessageEvents) => {
   commandQueue.push(e.data);
-  // switch (e.data.type) {
-  //   case "Init":
-  //     initGL(e.data.data);
-  //     break;
-  //   case COMMAND_SET_RENDER:
-  //     setRender(e.data.data);
-  //     break;
-  //   case COMMAND_SET_EGLCONTEXT_CLIENT_VERSION:
-  //     setEGLContextClientVersion(e.data.data);
-  //     break;
-  //   case COMMAND_SET_RENDER_MODE:
-  //     setRenderMode(e.data.data);
-  //     break;
-  //   case COMMAND_SURFACE_CREATED:
-  //     initGL(e.data.data);
-  //     break;
-  //   case COMMAND_SURFACE_CHANGED:
-  //     surfaceChanged(e.data.data);
-  //     break;
-  //   case COMMAND_SURFACE_DESTROY:
-  //     surfaceDestroy();
-  //     break;
-  //   case COMMAND_REQUEST_RENDER:
-  //     requestRender(e.data.data.timestamp, e.data.data.targetTimeStamp);
-  //     break;
-  //   case COMMAND_EXECUTE:
-  //     execute(e.data.data);
-  //     break;
-  // }
-
 }
 
 /**
@@ -115,7 +85,7 @@ const initGL = (surfaceId: string): void => {
       egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
       egl.EGL_NONE];
 
-    eglConfig = eglDisplay.chooseConfig(attrib_list)[0];
+    eglConfig = eglDisplay.chooseConfig(attrib_list)![0];
 
     if (!eglConfig) {
       throw new Error("eglChooseConfig failed");
@@ -128,7 +98,7 @@ const initGL = (surfaceId: string): void => {
       throw new Error("eglCreateContext failed");
     }
 
-    eglSurface = eglDisplay.createSurfaceWindow(eglConfig, surfaceId);
+    eglSurface = eglDisplay.createWindowSurface(eglConfig, surfaceId);
     if (!eglSurface) {
       throw new Error("eglCreateWindowSurface failed");
     }
@@ -154,10 +124,10 @@ const setEGLContextClientVersion = (version: number): void => {
 }
 
 const setRenderMode = (mode: number): void => {
-  RenderMode = mode;
+  // RenderMode = mode;
 }
 
-const surfaceChanged = (rect: Rect): void=> {
+const surfaceChanged = (rect: Rect): void => {
   if (makeCurrent()) {
     glRender?.onSurfaceChanged(rect.width, rect.height);
   }
@@ -166,22 +136,22 @@ const surfaceChanged = (rect: Rect): void=> {
 const surfaceDestroy = (): void => {
   makeCurrent();
   glRender?.onSurfaceDestroyed();
-  eglDisplay?.destroyContext(eglContext);
-  eglDisplay?.destroySurface(eglSurface);
+  eglDisplay?.destroyContext(eglContext!);
+  eglDisplay?.destroySurface(eglSurface!);
   egl.eglReleaseThread();
   eglDisplay?.terminate();
   workerPort.postMessage({ type: MESSAGE_GL_FINISH })
 }
 
-const requestRender =  (timestamp: number, targetTimestamp: number): void => {
+const requestRender = (timestamp: number, targetTimestamp: number): void => {
   if (makeCurrent()) {
     if (glRender?.onDrawFrame(timestamp, targetTimestamp)) {
-      eglDisplay?.swapBuffers(eglSurface);
+      eglDisplay?.swapBuffers(eglSurface!);
     }
   }
 }
 
-const execute =  (callback: SendableCallback<GLRender>): void=> {
+const execute = (callback: SendableCallback<GLRender>): void => {
   if (glRender) {
     if (makeCurrent()) {
       callback(glRender);
@@ -190,9 +160,15 @@ const execute =  (callback: SendableCallback<GLRender>): void=> {
 
 }
 
+const init = (data: InitParam): void => {
+}
+
 commandQueue.onCommand((command: GLCommand, callback: Callback<void>) => {
   hilog.debug(GL_Thread_Domain, GL_Thread_Tag, "execute command type: %{public}s", command.type);
   switch (command.type) {
+    case COMMAND_INIT_WORKER:
+      init(command.data);
+      break;
     case COMMAND_SET_RENDER:
       setRender(command.data);
       break;
