@@ -135,7 +135,7 @@ export class GLViewController extends XComponentController {
 
   protected get eglSurface(): egl.EGLSurface {
     if (!this.__surface__) {
-      let surface = this.eglDisplay.createSurfaceWindow(this.eglConfig, this.getXComponentSurfaceId());
+      let surface = this.eglDisplay.createWindowSurface(this.eglConfig, this.getXComponentSurfaceId());
       if (!surface) {
         throw Error('egl create surface failed')
       }
