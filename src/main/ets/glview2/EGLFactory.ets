@@ -49,7 +49,7 @@ export class DefaultEGLFactory implements EGLFactory {
 
   getSurface(display: egl.EGLDisplay, surfaceId: string): egl.EGLSurface {
     if (!this.surface) {
-      let surface = display.createSurfaceWindow(this.getConfig(display), surfaceId);
+      let surface = display.createWindowSurface(this.getConfig(display), surfaceId);
       if (!surface) {
         throw new Error("eglCreateWindowSurface failed");
       }
