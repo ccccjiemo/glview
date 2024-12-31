@@ -146,8 +146,6 @@ export abstract class GLViewController {
       this.onDrawFrame(data?.timestamp || 0, data?.targetTimestamp || 0);
       this.swapBuffer();
     }
-
-
   }
 
   private eglDestroy(): void {
@@ -193,7 +191,7 @@ export abstract class GLViewController {
       egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
       egl.EGL_NONE];
 
-    if (!(this.eglConfig = this.eglDisplay.chooseConfig(attrib_list)[0])) {
+    if (!(this.eglConfig = this.eglDisplay.chooseConfig(attrib_list)![0])) {
       hilog.debug(DOMAIN, TAG, 'eglChooseConfig failed');
       throw new Error("eglChooseConfig failed");
     }

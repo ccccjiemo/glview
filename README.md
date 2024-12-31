@@ -14,8 +14,8 @@ GLView组件可以在arkTs侧进行opengl和egl操作。支持按需渲染和连
 ohpm install @jemoc/glview
 ```
 
-api12需要在工程级build-profile.json5中修改配置 (
-详细)[https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V13/arkts-sendable-V13#sendable-function]
+api12需要在工程级build-profile.json5中修改配置,添加Sendable
+function的支持  [详细](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V13/arkts-sendable-V13#sendable-function)
 
 ```json
 {
@@ -29,20 +29,35 @@ api12需要在工程级build-profile.json5中修改配置 (
 }
 ```
 
-## GLView
+---
+
+## GLView和GLViewV2
 
 ### 接口
 
 ```typescript
-GLView({ options: { controller: GLViewController, eglContextClientVersion: number, renderMode: GLViewRenderMode } })
+GLView({
+  controller: GLViewController,
+  eglContextClientVersion: number,
+  renderMode: GLViewRenderMode,
+  expectedFrameRange: ExpectedFrameRateRange
+})
+
+//V2组件版本  
+GLViewV2({
+  controller: GLViewController,
+  eglContextClientVersion: number,
+  renderMode: GLViewRenderMode,
+  expectedFrameRange: ExpectedFrameRateRange
+})
 ```
 
-| 参数名                     | 类型               | 必填 | 说明                                                                            |
-|-------------------------|------------------|----|-------------------------------------------------------------------------------|
-| controller              | GLViewController | 否  | 渲染控制器,需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
-| eglContextClientVersion | number           | 否  | 设置egl context client版本，默认值2                                                   |
-| renderMode              | GLViewRenderMode | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                      |
-| onCreated               | Function         | 否  | egl初始化成功回调                                                                    |
+| 参数名                     | 类型                     | 必填 | 说明                                                                                                    |
+|-------------------------|------------------------|----|-------------------------------------------------------------------------------------------------------|
+| controller              | GLViewController       | 否  | 渲染控制器,继承自XComponentController,需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
+| eglContextClientVersion | number                 | 否  | 设置egl context client版本，默认值2                                                                           |
+| renderMode              | GLViewRenderMode       | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                                              |
+| expectedFrameRange      | ExpectedFrameRateRange | 否  | displaySync期望帧率                                                                                       |
 
 ### GLViewRenderMode
 
@@ -53,82 +68,101 @@ GLView({ options: { controller: GLViewController, eglContextClientVersion: numbe
 
 ### GLViewController
 
-#### onSurfaceCreated(): void
+<font color="red">GLViewController在1.2.0版作出变更，此类继承XComponentController(画中画需要XComponentController)</font>
 
-组件创建Surface成功时调用此方法，开发者可以在此方法初始化opengl所需要的资源
+#### onSurfaceCreated(surfaceId: string): void
 
-#### onSurfaceChanged(rect: SurfaceRect): void
+- 组件创建Surface成功时调用此方法，开发者可以在此方法初始化opengl所需要的资源,此方法也是XComponentController的onSurfaceCreated方法
 
-组件Surface大小改变时调用此方法
+#### onSurfaceChanged(surfaceId: string,rect: SurfaceRect): void
 
-#### onSurfaceDestroy(): void
+- 组件Surface大小改变时调用此方法,此方法也是XComponentController的onSurfaceChanged方法
 
-组件Surface销毁时调用此方法，开发者需要在此方法销毁opengl资源
+#### onSurfaceDestroyed(surfaceId: string): void
+
+- 组件Surface销毁时调用此方法，开发者需要在此方法销毁opengl资源,此方法也是XComponentController的onSurfaceDestroyed方法
 
 #### onDrawFrame(timestamp: number, targetTimeStamp: number): boolean
 
-组件绘制每一帧都会调用此方法,通过返回值影响是否swapBuffer
+- 组件绘制每一帧都会调用此方法,通过返回值影响是否执行swapBuffer，可以改变渲染速率
 
 #### setEGLContextClientVersion(version: number): void
 
-设置egl context client版本。此方法需要在onSurfaceCreated前使用。此方法与组件接口eglContextClientVersion冲突。
+- 设置egl context client版本。此方法需要在onSurfaceCreated前使用。此方法与组件接口eglContextClientVersion冲突。
 
 #### setRenderMode(mode: GLViewRenderMode):void
 
-更改组件渲染模式
+- 更改组件渲染模式
 
 #### makeCurrent(): boolean
 
-绑定egl上下文
+- 绑定egl上下文
 
 #### swapBuffer(): void
 
-交换前缓冲区和后缓冲区
+- 交换前缓冲区和后缓冲区
 
-#### 1.1.0版本暂时可以在controller内部获取eglSurface、eglDisplay、eglContext、eglConfig。后续会提供自定义egl初始化
+#### requestRender(): void
+
+- 请求渲染一帧，onDrawFrame中如果返回false则不渲染
+
+#### get eglDisplay(): EGLDisplay
+
+- 获取EGLDisplay,子类可重写方法，实现自己的需求
+
+#### get eglConfig(): EGLConfig
+
+- 获取EGLConfig,子类可重写方法，实现自己的需求
+
+#### get eglContext(): EGLContext
+
+- 获取EGLContext,子类可重写方法，实现自己的需求
+
+#### get eglSurface(): EGLSurface
+
+- 获取EGLSurface,子类可重写方法，实现自己的需求
 
 ---
 
-## GLView2
+## GLView2和GLView2V2
 
 ### 接口
 
 ```typescript
 GLView2({
-  options: {
-    controller: GLController,
-    eglContextClientVersion: number,
-    renderMode: GLViewRenderMode,
-    render: GLRender
-  }
+  controller: GLController,
+  eglContextClientVersion: number,
+  renderMode: GLViewRenderMode,
+  render: GLRender
 })
 ```
 
-| 参数名                     | 类型                     | 必填 | 说明                                                                      |
-|-------------------------|------------------------|----|-------------------------------------------------------------------------|
-| controller              | GLController           | 否  | 与GLViewController不同，仅提供setRenderMode、requestRender等方法                   |
-| eglContextClientVersion | number                 | 否  | 设置egl context client版本，默认值2                                             |
-| renderMode              | GLViewRenderMode       | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                |
-| render                  | GLRender               | 否  | 需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法 |
-| expectedFrameRateRange  | ExpectedFrameRateRange | 否  | vSync期望帧率                                                               |
+| 参数名                     | 类型                     | 必填 | 说明                                                                              |
+|-------------------------|------------------------|----|---------------------------------------------------------------------------------|
+| controller              | GLController           | 否  | 与GLViewController不同，仅提供setRenderMode、requestRender等方法，同样继承自XComponentController |
+| eglContextClientVersion | number                 | 否  | 设置egl context client版本，默认值2                                                     |
+| renderMode              | GLViewRenderMode       | 否  | 设置组件渲染模式， 默认值 WHEN_DIRTY                                                        |
+| render                  | GLRender               | 否  | 需要开发者实现onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame方法         |
+| expectedFrameRateRange  | ExpectedFrameRateRange | 否  | vSync期望帧率                                                                       |
+| eglFactory              | EGLFactory             | 否  | EGLConfig、EGLSurface、EGLContext创建工厂                                             |
 
 ### GLController
 
 #### setEGLContextClientVersion(version: number): void
 
-设置egl context client版本。此方法需要在onSurfaceCreated前使用。此方法与组件接口eglContextClientVersion冲突。
+- 设置egl context client版本。此方法需要在onSurfaceCreated前使用。此方法与组件接口eglContextClientVersion冲突。
 
 #### setRenderMode(mode: GLViewRenderMode):void
 
-更改组件渲染模式
+- 更改组件渲染模式
 
 #### requestRender():void
 
-WHEN_DIRTY模式下请求绘制一帧
+- WHEN_DIRTY模式下请求绘制一帧
 
 #### execute<T extends GLRender>(callback: SendableCallback<T>)
 
-发送一个@Sendable装饰的function。此方法下提供egl环境
+- 发送一个@Sendable装饰的function。此方法下提供egl环境
 
 ```typescript
 //例如使用execute方法来更新NativeImage
@@ -145,8 +179,35 @@ nativeImage.setOnFrameAvailableListener(() => {
 
 ### GLRender
 
-GLRender继承自”lang.ISendable“，使得渲染任务在Worker中完成。onSurfaceCreated、onSurfaceDestroy、onSurfaceChanged、onDrawFrame等方法见GLViewController说明
+GLRender继承自”lang.ISendable“,实现OpenGL渲染
 
+```typescript
+interface GLRender extends lang.ISendable {
+onSurfaceCreated(): void;
+
+onSurfaceChanged(width: number, height: number): void;
+
+onSurfaceDestroyed(): void;
+
+onDrawFrame(timestamp: number, targetTimestamp: number): boolean;
+}
+```
+
+### EGLFactory
+
+EGLFactory继承自”lang.ISendable“，提供EGL环境支持
+
+```typescript
+interface EGLFactory extends lang.ISendable {
+getConfig(display: egl.EGLDisplay): egl.EGLConfig
+
+getContext(display: egl.EGLDisplay, eglContextClientVersion: number): egl.EGLContext
+
+getSurface(display: egl.EGLDisplay, surfaceId: string): egl.EGLSurface
+
+destroy(display: egl.EGLDisplay): void
+}
+```
 
 ---
 
@@ -199,7 +260,7 @@ class MyController extends GLViewController {
   private vao?: gles.VertexArray;
   private vbo?: gles.Buffer;
 
-  onSurfaceChanged(rect: SurfaceRect): void {
+  onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void {
     gles.glViewport(0, 0, rect.surfaceWidth, rect.surfaceHeight);
   }
 
@@ -210,7 +271,7 @@ class MyController extends GLViewController {
     gles.glDeleteVertexArrays([this.vao]);
   }
 
-  onSurfaceCreated(): void {
+  onSurfaceCreated(surfaceId: string): void {
     this.program = new gles.Program();
     let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, this.vertexShaderSource);
     let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, this.fragmentShaderSource);
@@ -321,7 +382,6 @@ struct Index {
   private controller: GLController = new GLController();
   @State renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
   
-  //this.controller.requestRender();
   build() {
     Column() {
        GLView2({
@@ -335,3 +395,120 @@ struct Index {
 ```
 
 ![img.png](img.png)
+
+### 分享BuilderNode配合NativeImage案例
+
+#### 实现要导出纹理的BuilderNode
+
+```text
+//MyComponent.ets
+@Component
+struct MyComponent {
+  build() {
+    //组件内容
+  }
+}
+
+@Builder
+function BuildMyComponent() {
+  MyComponent()
+}
+
+```
+
+```typescript
+//MyBuilderNode.ets
+class MyBuilderNode extends NodeController {
+  private myNode: BuilderNode<ESObject> | null = null
+  surfaceId: string = ''
+
+  makeNode(context: UIContext): FrameNode | null {
+    if (!this.myNode) {
+      this.myNode = new BuilderNode(context, { surfaceId: this.surfaceId, type: NodeRenderType.RENDER_TYPE_TEXTURE })
+      this.myNode.build(wrapBuilder(BuildMyComponent))
+    }
+    return this.myNode.getFrameNode()
+  }
+}
+```
+
+#### 实现GLRender
+
+```typescript
+//MyRender.ets
+import { gles } from '@jemoc/glview'
+
+@Sendable
+class MyRender implements GLRender {
+  nativeImage: gles.NativeImage
+  texture?: gles.Texture2
+
+  constructor() {
+    this.nativeImage = new gles.NativeImage()
+  }
+
+  onSurfaceCreated(): void {
+    this.texture = new gles.Texture2(gles.GL_TEXTURE_EXTERNAL_OES);
+    this.texture
+      .setParameter(gles.GL_TEXTURE_WRAP_S, gles.GL_REPEAT)
+      .setParameter(gles.GL_TEXTURE_WRAP_T, gles.GL_REPEAT)
+      .setParameter(gles.GL_TEXTURE_MIN_FILTER, gles.GL_LINEAR)
+      .setParameter(gles.GL_TEXTURE_MAG_FILTER, gles.GL_LINEAR)
+
+    let error = this.nativeImage.attachContext(this.texture.id);
+
+    //开发者其他初始化内容
+  }
+
+  onSurfaceChanged(width: number, height: number): void {
+
+  }
+
+  onSurfaceDestroyed(): void {
+    this.nativeImage.destroy()
+    this.texture.delete()
+    //开发者实现的资源回收
+  }
+
+  onDrawFrame(timestamp: number, targetTimestamp: number): boolean {
+    //开发者实现的纹理渲染
+    return true;
+  }
+}
+
+```
+
+#### BuilderNode绑定NativeImage的surfaceId,并通过NativeImage的FrameAvailable回调更新纹理和完成渲染
+
+```text
+//Index.ets
+@Sendable
+function updateFrame(render: MyRender) {
+  render.nativeImage.updateSurfaceImage()
+}
+
+@Component
+struct Index {
+  private myRender: MyRender = new MyRender()
+  private controller: GLController = new GLController()
+  private myNode: MyBuilderNode = new MyBuilderNode();
+  
+  aboutToAppear(){
+    this.myNode.surfaceId = this.myRender.nativeImage.surfaceId;
+    this.myRender.nativeImage.setOnFrameAvailableListener(() => {
+      this.controller.execute(updateFrame)
+      this.controller.requestRender()
+    })
+  }
+  build(){
+    Stack() {
+      NodeContainer(this.myNode)
+      GLView2({
+        mode: GLViewRenderMode.WHEN_DIRTY,
+        controller: this.controller,
+        render: this.myRender
+      })
+    }
+  }
+}
+```

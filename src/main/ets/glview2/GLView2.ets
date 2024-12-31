@@ -1,29 +1,31 @@
 import { DefaultExpectedFrameRateRange } from '../common/constants';
 import { GLViewRenderMode } from '../common/GLViewRenderMode';
+import { DefaultEGLFactory, EGLFactory } from './EGLFactory';
 import { GLController } from './GLController';
 import { DefaultRender, GLRender } from './GLRender';
-import { GLThread } from './GLThread';
 
 type EGLContextVersion = 2 | 3;
 
 @Component
 export struct GLView2 {
-  private glThread: GLThread = new GLThread();
   render: GLRender = new DefaultRender();
   eglContextClientVersion: EGLContextVersion = 2;
   controller: GLController = new GLController();
   expectedFrameRateRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
-  @Prop @Watch('renderModeChanged') renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
-
+  eglFactory: EGLFactory = new DefaultEGLFactory();
+  @Prop @Watch('renderModeChanged') renderMode: 0 | 1 = GLViewRenderMode.WHEN_DIRTY;
 
   renderModeChanged(prop: string) {
-    this.controller.setRenderMode(this.renderMode);
+    this.controller.setRenderMode(Number(this.renderMode));
   }
 
   aboutToAppear(): void {
-    this.glThread.setGLController(this.controller);
-    this.controller.setRender(this.render);
-    this.controller.setEGLContextClientVersion(this.eglContextClientVersion);
+    this.controller.init({
+      render: this.render,
+      eglContextClientVersion: this.eglContextClientVersion,
+      eglFactory: this.eglFactory
+    })
+
     this.controller.setExpectedFrameRateRange(this.expectedFrameRateRange);
     this.controller.setRenderMode(this.renderMode)
   }
@@ -31,17 +33,17 @@ export struct GLView2 {
   build() {
     XComponent({
       type: XComponentType.SURFACE,
-      controller: this.glThread
+      controller: this.controller
     })
   }
 }
 
 @ComponentV2
 export struct GLView2V2 {
-  private glThread: GLThread = new GLThread();
   render: GLRender = new DefaultRender();
   eglContextClientVersion: EGLContextVersion = 2;
   controller: GLController = new GLController();
+  eglFactory: EGLFactory = new DefaultEGLFactory();
   expectedFrameRateRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
   @Param renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
@@ -55,17 +57,19 @@ export struct GLView2V2 {
   }
 
   aboutToAppear(): void {
-    this.glThread.setGLController(this.controller);
-    this.controller.setRender(this.render);
+    this.controller.init({
+      render: this.render,
+      eglContextClientVersion: this.eglContextClientVersion,
+      eglFactory: this.eglFactory
+    })
     this.controller.setExpectedFrameRateRange(this.expectedFrameRateRange);
-    this.controller.setEGLContextClientVersion(this.eglContextClientVersion);
     this.controller.setRenderMode(this.renderMode)
   }
 
   build() {
     XComponent({
       type: XComponentType.SURFACE,
-      controller: this.glThread
+      controller: this.controller
     })
   }
 }

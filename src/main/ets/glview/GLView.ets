@@ -1,32 +1,28 @@
+import { DefaultExpectedFrameRateRange } from "../common/constants";
 import { GLViewRenderMode } from "../common/GLViewRenderMode";
-import { GLViewController } from "./GLViewController";
-import { ViewController } from "./ViewController";
+import { GLViewController } from "./GLViewController2";
 
 
 @Component
 export struct GLView {
-  controller?: GLViewController;
-  eglContextClientVersion?: number;
-  onCreated?: Function
-  private viewController: ViewController = new ViewController();
+  controller: GLViewController = new GLViewController();
+  eglContextClientVersion: number = 2;
+  expectedFrameRange: ExpectedFrameRateRange = DefaultExpectedFrameRateRange;
   @Prop @Watch('onRenderModeChanged') renderMode: GLViewRenderMode = GLViewRenderMode.WHEN_DIRTY;
 
   onRenderModeChanged(propName: string) {
-    this.controller?.setRenderMode(this.renderMode);
+    this.controller.setRenderMode(this.renderMode);
   }
 
   aboutToAppear(): void {
-    this.viewController.setController(this.controller);
-    if (this.eglContextClientVersion != undefined) {
-      this.controller?.setEGLContextClientVersion(this.eglContextClientVersion);
-    }
-    this.controller?.setRenderMode(this.renderMode);
-    this.controller?.registerOnCreated(this.onCreated);
+    this.controller.setRenderMode(this.renderMode);
+    this.controller.setEGLContextClientVersion(this.eglContextClientVersion);
+    this.controller.setExpectedFrameRateRange(this.expectedFrameRange);
   }
 
   build() {
     XComponent({
-      controller: this.viewController,
+      controller: this.controller,
       type: XComponentType.SURFACE
     })
   }
