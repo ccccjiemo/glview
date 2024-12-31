@@ -202,7 +202,7 @@ export abstract class GLViewController {
       throw new Error("eglCreateContext failed");
     }
 
-    if (!(this.eglSurface = this.eglDisplay.createWindowSurface(this.eglConfig, surfaceId))) {
+    if (!(this.eglSurface = this.eglDisplay.createSurfaceWindow(this.eglConfig, surfaceId))) {
       hilog.debug(DOMAIN, TAG, 'eglCreateWindowSurface failed');
       throw new Error("eglCreateWindowSurface failed");
     }
