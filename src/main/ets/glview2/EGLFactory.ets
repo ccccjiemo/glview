@@ -1,5 +1,6 @@
 import { egl } from '@jemoc/egl'
 import { lang } from '@kit.ArkTS'
+import { Config_Attrib_list } from '../common/constants'
 
 export interface EGLFactory extends lang.ISendable {
   getConfig(display: egl.EGLDisplay): egl.EGLConfig
@@ -19,13 +20,7 @@ export class DefaultEGLFactory implements EGLFactory {
 
   getConfig(display: egl.EGLDisplay): egl.EGLConfig {
     if (!this.config) {
-      let attrib_list = [
-        egl.EGL_RED_SIZE, 8,
-        egl.EGL_BLUE_SIZE, 8,
-        egl.EGL_GREEN_SIZE, 8,
-        egl.EGL_SURFACE_TYPE, egl.EGL_WINDOW_BIT,
-        egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT_KHR | egl.EGL_OPENGL_ES2_BIT,
-        egl.EGL_NONE];
+      let attrib_list = Config_Attrib_list;
       let configs = display.chooseConfig(attrib_list);
       if (!configs || configs.length == 0) {
         throw new Error("eglChooseConfig failed");

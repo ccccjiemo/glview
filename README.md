@@ -31,6 +31,11 @@ function的支持  [详细](https://developer.huawei.com/consumer/cn/doc/harmony
 
 ---
 
+## 2025-02-06
+<font color="red">组件初始化遇到createSurface错误，可以重写eglConfig方法。真机调试遇到相同配置，模拟器能正常创建surface，真机返回空值</font>
+
+---
+
 ## GLView和GLViewV2
 
 ### 接口
@@ -254,49 +259,56 @@ const vertex_list: Float32Array = new Float32Array([
 import { GLViewController, gles } from '@jemoc/glview'
 
 //gles使用案例见@jemoc/gles
-
 class MyController extends GLViewController {
-  private program?: gles.Program;
-  private vao?: gles.VertexArray;
-  private vbo?: gles.Buffer;
-
-  onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void {
-    gles.glViewport(0, 0, rect.surfaceWidth, rect.surfaceHeight);
-  }
-
-  onSurfaceDestroyed(): void {
-    //回收buffer和program
-    gles.glDeleteBuffers([this.vbo]);
-    gles.glDeleteProgram(this.program);
-    gles.glDeleteVertexArrays([this.vao]);
-  }
+  private vbo?: globjects.Buffer;
+  private vao?: globjects.VertexArray;
+  private program?: globjects.Program;
 
   onSurfaceCreated(surfaceId: string): void {
-    this.program = new gles.Program();
-    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, this.vertexShaderSource);
-    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, this.fragmentShaderSource);
+    let program = new globjects.Program();
+    let vertexShader = new globjects.Shader(gles.GL_VERTEX_SHADER, vertexShaderSource);
+    let fragmentShader = new globjects.Shader(gles.GL_FRAGMENT_SHADER, fragmentShaderSource);
     if (!program.attach(vertexShader, fragmentShader)) {
       throw Error('compile program fail')
     }
+
     //program.detach(vertexShader, fragmentShader);
-    this.vao = new gles.VertexArray();
-    this.vbo = new gles.Buffer(gles.GL_ARRAY_BUFFER);
-    vbo.setData(this.vertex_list, gles.GL_STATIC_DRAW);
+
+    let vao = new globjects.VertexArray();
+
+    let vbo = new globjects.Buffer(gles.GL_ARRAY_BUFFER);
+
+    vbo.setData(vertex_list, gles.GL_STATIC_DRAW);
+
     vao.setBuffer(vbo, 0, 3, gles.GL_FLOAT, false, 24, 0);
     vao.enable(0);
     vao.setBuffer(vbo, 1, 3, gles.GL_FLOAT, false, 24, 12);
     vao.enable(1);
     vao.unbind();
+
     this.program = program;
     this.vao = vao;
     this.vbo = vbo;
   }
 
-  onDrawFrame(timestamp: number, targetTimestamp: number): void {
-    gles.glClearColor(0.6, 0.6, 0.6, 1.0);
+  onSurfaceChanged(surfaceId: string, rect: SurfaceRect): void {
+  }
+
+  onSurfaceDestroyed(surfaceId: string): void {
+    this.program?.delete()
+    this.vao?.delete()
+    this.vbo?.delete()
+  }
+
+  protected onDrawFrame(timestamp: number, targetTimestamp: number): boolean {
+    gles.glClearColor(Math.random(), 0.5, 0.9, 1.0);
     gles.glClear(gles.GL_COLOR_BUFFER_BIT | gles.GL_DEPTH_BUFFER_BIT);
+
     this.program?.bind();
-    this.vao?.glDrawArrays(gles.GL_TRIANGLES, 0, 3);
+
+    this.vao?.drawArrays(gles.GL_TRIANGLES, 0, 3);
+    this.vao?.unbind();
+    return true;
   }
 }
 ```
@@ -330,26 +342,32 @@ struct Index {
 ```typescript
 @Sendable
 class MyRender implements GLRender {
-  private vbo?: gles.Buffer2;
-  private vao?: gles.VertexArray2;
-  private program?: gles.Program2;
+  private vbo?: globjects.Buffer;
+  private vao?: globjects.VertexArray;
+  private program?: globjects.Program;
 
   onSurfaceCreated(): void {
-    let program = new gles.Program2();
-    let vertexShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_VERTEX_SHADER, vertexShaderSource);
-    let fragmentShader: gles.Shader2 = gles.Shader2.fromString(gles.GL_FRAGMENT_SHADER, fragmentShaderSource);
+    let program = new globjects.Program();
+    let vertexShader = new globjects.Shader(gles.GL_VERTEX_SHADER, vertexShaderSource);
+    let fragmentShader = new globjects.Shader(gles.GL_FRAGMENT_SHADER, fragmentShaderSource);
     if (!program.attach(vertexShader, fragmentShader)) {
       throw Error('compile program fail')
     }
+
     //program.detach(vertexShader, fragmentShader);
-    let vao = new gles.VertexArray2();
-    let vbo = new gles.Buffer2(gles.GL_ARRAY_BUFFER);
+
+    let vao = new globjects.VertexArray();
+
+    let vbo = new globjects.Buffer(gles.GL_ARRAY_BUFFER);
+
     vbo.setData(vertex_list, gles.GL_STATIC_DRAW);
+
     vao.setBuffer(vbo, 0, 3, gles.GL_FLOAT, false, 24, 0);
     vao.enable(0);
     vao.setBuffer(vbo, 1, 3, gles.GL_FLOAT, false, 24, 12);
     vao.enable(1);
     vao.unbind();
+
     this.program = program;
     this.vao = vao;
     this.vbo = vbo;
@@ -436,26 +454,26 @@ class MyBuilderNode extends NodeController {
 
 ```typescript
 //MyRender.ets
-import { gles } from '@jemoc/glview'
+import { gles, globjects } from '@jemoc/glview'
 
 @Sendable
 class MyRender implements GLRender {
   nativeImage: gles.NativeImage
-  texture?: gles.Texture2
+  texture?: globjects.Texture
 
   constructor() {
     this.nativeImage = new gles.NativeImage()
   }
 
   onSurfaceCreated(): void {
-    this.texture = new gles.Texture2(gles.GL_TEXTURE_EXTERNAL_OES);
+    this.texture = new globjects.Texture(gles.GL_TEXTURE_EXTERNAL_OES);
     this.texture
       .setParameter(gles.GL_TEXTURE_WRAP_S, gles.GL_REPEAT)
       .setParameter(gles.GL_TEXTURE_WRAP_T, gles.GL_REPEAT)
       .setParameter(gles.GL_TEXTURE_MIN_FILTER, gles.GL_LINEAR)
       .setParameter(gles.GL_TEXTURE_MAG_FILTER, gles.GL_LINEAR)
 
-    let error = this.nativeImage.attachContext(this.texture.id);
+    let error = this.nativeImage.attachContext(this.texture.handle);
 
     //开发者其他初始化内容
   }
@@ -512,3 +530,7 @@ struct Index {
   }
 }
 ```
+### 问题和意见反馈
+
+---
+如果遇到问题或者提供建议，可以提交[Issue](https://gitee.com/jiemoccc/glview/issues)

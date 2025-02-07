@@ -6,7 +6,7 @@ export { GLViewController } from './src/main/ets/glview/GLViewController2'
 
 export { GLViewRenderMode } from './src/main/ets/common/GLViewRenderMode'
 
-export { gles } from '@jemoc/gles'
+export { gles, globjects, glm } from '@jemoc/gles'
 
 export { egl } from '@jemoc/egl'
 
@@ -17,3 +17,5 @@ export { GLController } from './src/main/ets/glview2/GLController'
 export { GLRender } from './src/main/ets/glview2/GLRender'
 
 export { EGLFactory } from './src/main/ets/glview2/EGLFactory'
+
+export { GLTextureView, GLTextureViewController } from './src/main/ets/gltextureview/GLTextureView'

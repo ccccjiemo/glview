@@ -1,4 +1,12 @@
+## [1.2.1] - 2025-02-06
+
+- 更新egl和gles版本,修复因旧版本egl导致的bug,增加gles库新增的glm和globjects库
+- 更新文档，并添加issue地址
+
+---
+
 ## [1.2.0] - 2024-12-31
+
 - GLView/GLViewV2增加帧率期望参数
 - 重写GLViewController,继承自XComponentController,优化代码,提供更多方法
 - 增加EGLFactory，可以自定义egl环境的EGLConfig和EGLContext等
